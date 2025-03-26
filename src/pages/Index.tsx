@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
@@ -8,7 +7,7 @@ import CategorySection from '@/components/CategorySection';
 import GlassMorphicContainer from '@/components/GlassMorphicContainer';
 import WalletPreview from '@/components/WalletPreview';
 import UserProfilePreview from '@/components/UserProfilePreview';
-import { ChevronRight, Gamepad2, Trophy, Users, Zap, Shield, BarChart3 } from 'lucide-react';
+import { ChevronRight, Gamepad2, Trophy, Users, Zap, Shield, BarChart3, Wallet } from 'lucide-react';
 
 // Sample game data
 const BOARD_GAMES = [

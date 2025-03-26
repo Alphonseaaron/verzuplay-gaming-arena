@@ -4,17 +4,18 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getDatabase } from 'firebase/database';
 import { getStorage } from 'firebase/storage';
+import { getAnalytics } from 'firebase/analytics';
 
 // Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY", // Replace with your Firebase API key
-  authDomain: "verzusplay.firebaseapp.com", // Replace with your Firebase auth domain
-  projectId: "verzusplay", // Replace with your Firebase project ID
-  storageBucket: "verzusplay.appspot.com", // Replace with your Firebase storage bucket
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // Replace with your Firebase messaging sender ID
-  appId: "YOUR_APP_ID", // Replace with your Firebase app ID
-  databaseURL: "https://verzusplay-default-rtdb.firebaseio.com", // Replace with your Firebase database URL
+  apiKey: "AIzaSyCCdflWEvUffx9_oFUevPSl4IXnLO_uG9s",
+  authDomain: "verses2-f2526.firebaseapp.com",
+  databaseURL: "https://verses2-f2526-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "verses2-f2526",
+  storageBucket: "verses2-f2526.firebasestorage.app",
+  messagingSenderId: "1004664117130",
+  appId: "1:1004664117130:web:6a3473a6bbc9e1bfd41a73",
+  measurementId: "G-KH2XMHFFHP"
 };
 
 // Initialize Firebase
@@ -23,5 +24,6 @@ const auth = getAuth(app);
 const firestore = getFirestore(app);
 const database = getDatabase(app);
 const storage = getStorage(app);
+const analytics = getAnalytics(app);
 
-export { app, auth, firestore, database, storage };
+export { app, auth, firestore, database, storage, analytics };

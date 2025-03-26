@@ -5,6 +5,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
+import Games from "./pages/Games";
+import GameDetails from "./pages/GameDetails";
+import TicTacToeGame from "./games/TicTacToe/TicTacToeGame";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./lib/firebase/AuthContext";
 
@@ -19,10 +22,11 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
-            {/* These routes will be implemented in future updates */}
-            <Route path="/games" element={<Index />} />
-            <Route path="/games/:id" element={<Index />} />
-            <Route path="/games/category/:category" element={<Index />} />
+            <Route path="/games" element={<Games />} />
+            <Route path="/games/:id" element={<GameDetails />} />
+            <Route path="/games/:id/play" element={<TicTacToeGame />} />
+            <Route path="/games/:id/match/:matchId" element={<TicTacToeGame />} />
+            <Route path="/games/category/:category" element={<Games />} />
             <Route path="/tournaments" element={<Index />} />
             <Route path="/leaderboard" element={<Index />} />
             <Route path="/wallet" element={<Index />} />

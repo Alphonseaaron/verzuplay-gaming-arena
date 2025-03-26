@@ -96,6 +96,8 @@ const TetrisGame = () => {
   const currentPieceRef = useRef(currentPiece);
   const gameOverRef = useRef(gameOver);
   const isRunningRef = useRef(isRunning);
+  const scoreRef = useRef(score);
+  const levelRef = useRef(level);
   
   useEffect(() => {
     // In a real app, we would connect to Firebase or another backend here
@@ -129,6 +131,14 @@ const TetrisGame = () => {
   useEffect(() => {
     isRunningRef.current = isRunning;
   }, [isRunning]);
+  
+  useEffect(() => {
+    scoreRef.current = score;
+  }, [score]);
+  
+  useEffect(() => {
+    levelRef.current = level;
+  }, [level]);
   
   // Initialize game
   useEffect(() => {
@@ -304,8 +314,8 @@ const TetrisGame = () => {
     
     if (rowsCleared > 0) {
       // Update score based on rows cleared
-      const points = [0, 100, 300, 500, 800][rowsCleared] * level;
-      const newScore = score + points;
+      const points = [0, 100, 300, 500, 800][rowsCleared] * levelRef.current;
+      const newScore = scoreRef.current + points;
       setScore(newScore);
       
       // Update level every 10 rows cleared

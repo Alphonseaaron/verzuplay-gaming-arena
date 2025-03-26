@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
@@ -7,7 +6,7 @@ import GameCard from '@/components/GameCard';
 import GlassMorphicContainer from '@/components/GlassMorphicContainer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Gamepad2, ChessKing, Rows3, Trophy, Hash, Dice5, Joystick } from 'lucide-react';
+import { Search, Gamepad2, Chess, Rows3, Trophy, Hash, Dice5, Joystick } from 'lucide-react';
 
 // Sample game data
 const ALL_GAMES = [
@@ -132,7 +131,7 @@ const ALL_GAMES = [
 // Game categories
 const CATEGORIES = [
   { id: 'all', name: 'All Games', icon: Gamepad2 },
-  { id: 'board', name: 'Board Games', icon: ChessKing },
+  { id: 'board', name: 'Board Games', icon: Chess },
   { id: 'skill', name: 'Skill Games', icon: Trophy },
   { id: 'casino', name: 'Casino Games', icon: Dice5 },
   { id: 'new', name: 'New Games', icon: Joystick }

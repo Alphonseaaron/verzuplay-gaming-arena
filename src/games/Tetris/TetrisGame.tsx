@@ -309,7 +309,8 @@ const TetrisGame = () => {
       
       // Update level every 10 rows cleared
       const totalCleared = Math.floor((score + points) / 1000);
-      setLevel(Math.max(1, Math.min(10, Math.floor(totalCleared / 10) + 1)));
+      const newLevel = Math.max(1, Math.min(10, Math.floor(totalCleared / 10) + 1));
+      setLevel(newLevel);
       
       setBoard(newBoard);
       boardRef.current = newBoard;

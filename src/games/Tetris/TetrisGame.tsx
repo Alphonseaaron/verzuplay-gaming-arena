@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
@@ -317,7 +316,7 @@ const TetrisGame = () => {
       const pointsArray = [0, 100, 300, 500, 800];
       const pointsValue = pointsArray[rowsCleared] || 0;
       const currentLevel = levelRef.current;
-      const points = pointsValue * currentLevel;
+      const points = pointsValue * (currentLevel as number);
       const newScore = scoreRef.current + points;
       setScore(newScore);
       

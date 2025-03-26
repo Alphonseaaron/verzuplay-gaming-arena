@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { database } from '@/lib/firebase/firebase';
@@ -9,7 +8,7 @@ import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import GlassMorphicContainer from '@/components/GlassMorphicContainer';
-import { Copy, RefreshCw, ArrowLeft } from 'lucide-react';
+import { Copy, RefreshCw, ArrowLeft, X, Circle } from 'lucide-react';
 
 interface TicTacToeState {
   board: string[][];
@@ -288,6 +287,43 @@ const TicTacToeGame = () => {
     return true;
   }
   
+  // Render cell content with better visuals
+  const renderCellContent = (cell: string) => {
+    if (cell === 'X') {
+      return <X className="h-10 w-10 text-verzus-accent stroke-[3]" />;
+    } else if (cell === 'O') {
+      return <Circle className="h-10 w-10 text-verzus-warning stroke-[3]" />;
+    }
+    return null;
+  };
+  
+  // Helper function to determine if a cell is part of the winning line
+  function isPartOfWinningLine(row: number, col: number, board: string[][]): boolean {
+    const symbol = board[row][col];
+    if (!symbol) return false;
+    
+    // Check row
+    if (board[row][0] === symbol && board[row][1] === symbol && board[row][2] === symbol) {
+      return true;
+    }
+    
+    // Check column
+    if (board[0][col] === symbol && board[1][col] === symbol && board[2][col] === symbol) {
+      return true;
+    }
+    
+    // Check diagonals
+    if (row === col && board[0][0] === symbol && board[1][1] === symbol && board[2][2] === symbol) {
+      return true;
+    }
+    
+    if (row + col === 2 && board[0][2] === symbol && board[1][1] === symbol && board[2][0] === symbol) {
+      return true;
+    }
+    
+    return false;
+  }
+  
   return (
     <div className="min-h-screen flex flex-col">
       <Navigation />
@@ -307,35 +343,49 @@ const TicTacToeGame = () => {
               <h1 className="text-3xl font-bold mb-6 text-center text-white">Tic-Tac-Toe</h1>
               
               <div className="w-full max-w-xs mx-auto">
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-4">
                   {gameState.board.map((row, rowIndex) => (
-                    row.map((cell, colIndex) => (
-                      <div 
-                        key={`${rowIndex}-${colIndex}`}
-                        className={`
-                          aspect-square flex items-center justify-center 
-                          text-4xl font-bold rounded 
-                          ${cell ? 'bg-verzus-background-light' : 'bg-verzus-background-secondary cursor-pointer hover:bg-verzus-background-light/50'}
-                          ${(!isPlayerTurn && isMultiplayer && !cell) ? 'cursor-not-allowed' : ''}
-                          transition-colors duration-200
-                        `}
-                        onClick={() => handleCellClick(rowIndex, colIndex)}
-                      >
-                        <span className={cell === 'X' ? 'text-verzus-accent' : 'text-verzus-warning'}>
-                          {cell}
-                        </span>
-                      </div>
-                    ))
+                    row.map((cell, colIndex) => {
+                      // Determine if this cell is part of the winning line
+                      const isWinningCell = gameState.winner && isPartOfWinningLine(rowIndex, colIndex, gameState.board);
+                      
+                      return (
+                        <div 
+                          key={`${rowIndex}-${colIndex}`}
+                          className={`
+                            aspect-square flex items-center justify-center 
+                            text-4xl font-bold rounded-lg border-2
+                            ${isWinningCell ? 'border-verzus-success bg-verzus-success/20' : 'border-verzus-background-light'}
+                            ${cell ? 'bg-verzus-background-secondary/70' : 'bg-verzus-background-secondary hover:bg-verzus-background-light/50 cursor-pointer'}
+                            ${(!isPlayerTurn && isMultiplayer && !cell) ? 'cursor-not-allowed' : ''}
+                            transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-1
+                          `}
+                          onClick={() => handleCellClick(rowIndex, colIndex)}
+                        >
+                          {renderCellContent(cell)}
+                        </div>
+                      );
+                    })
                   ))}
                 </div>
               </div>
               
               {gameState.gameOver && (
-                <div className="mt-8 text-center">
+                <div className="mt-8 text-center animate-slide-up">
                   <h2 className="text-2xl font-bold mb-4 text-white">
-                    {gameState.winner ? `${gameState.winner} Wins!` : "It's a Draw!"}
+                    {gameState.winner ? (
+                      <span className="text-gradient">
+                        {gameState.winner === 'X' ? (
+                          <span className="text-verzus-accent">X</span>
+                        ) : (
+                          <span className="text-verzus-warning">O</span>
+                        )} Wins!
+                      </span>
+                    ) : (
+                      <span className="text-verzus-text-primary">It's a Draw!</span>
+                    )}
                   </h2>
-                  <Button onClick={resetGame} className="flex items-center">
+                  <Button onClick={resetGame} className="flex items-center bg-verzus-primary hover:bg-verzus-primary/80">
                     <RefreshCw className="mr-2 h-4 w-4" /> Play Again
                   </Button>
                 </div>
@@ -343,11 +393,30 @@ const TicTacToeGame = () => {
               
               {!gameState.gameOver && (
                 <div className="mt-6 text-center text-white">
-                  {isMultiplayer ? (
-                    isPlayerTurn ? "Your turn" : "Opponent's turn"
-                  ) : (
-                    `Current turn: ${gameState.currentPlayer}`
-                  )}
+                  <div className="flex items-center justify-center gap-2 font-bold">
+                    {isMultiplayer ? (
+                      isPlayerTurn ? (
+                        <div className="bg-verzus-primary/20 py-2 px-4 rounded-full animate-pulse-soft">
+                          Your turn
+                        </div>
+                      ) : (
+                        <div className="bg-verzus-background-light/40 py-2 px-4 rounded-full">
+                          Opponent's turn
+                        </div>
+                      )
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        Current turn: 
+                        <span className={gameState.currentPlayer === 'X' ? 'text-verzus-accent' : 'text-verzus-warning'}>
+                          {gameState.currentPlayer === 'X' ? (
+                            <X className="h-5 w-5 inline-block stroke-[3]" />
+                          ) : (
+                            <Circle className="h-5 w-5 inline-block stroke-[3]" />
+                          )}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </GlassMorphicContainer>
@@ -361,7 +430,14 @@ const TicTacToeGame = () => {
                 <>
                   <div className="mb-4">
                     <p className="text-verzus-text-secondary mb-1">Your symbol</p>
-                    <p className="text-white font-bold text-xl">{playerSymbol}</p>
+                    <p className="text-white font-bold text-xl flex items-center">
+                      {playerSymbol === 'X' ? (
+                        <X className="h-6 w-6 text-verzus-accent stroke-[3] mr-2" />
+                      ) : (
+                        <Circle className="h-6 w-6 text-verzus-warning stroke-[3] mr-2" />
+                      )}
+                      {playerSymbol}
+                    </p>
                   </div>
                   
                   <div className="mb-4">
@@ -392,12 +468,18 @@ const TicTacToeGame = () => {
                   
                   <div className="mb-4">
                     <p className="text-verzus-text-secondary mb-1">Your symbol</p>
-                    <p className="text-white font-bold text-xl">X</p>
+                    <p className="text-white font-bold text-xl flex items-center">
+                      <X className="h-6 w-6 text-verzus-accent stroke-[3] mr-2" />
+                      X
+                    </p>
                   </div>
                   
                   <div className="mb-4">
                     <p className="text-verzus-text-secondary mb-1">AI symbol</p>
-                    <p className="text-white font-bold text-xl">O</p>
+                    <p className="text-white font-bold text-xl flex items-center">
+                      <Circle className="h-6 w-6 text-verzus-warning stroke-[3] mr-2" />
+                      O
+                    </p>
                   </div>
                 </>
               )}

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import GlassMorphicContainer from './GlassMorphicContainer';
-import { Wallet, ArrowUpRight, TrendingUp, ChevronRight } from 'lucide-react';
+import { Wallet as WalletIcon, ArrowUpRight, TrendingUp, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const WalletPreview = () => {
@@ -11,7 +11,7 @@ const WalletPreview = () => {
       
       <div className="flex items-center mb-6">
         <div className="w-10 h-10 rounded-full bg-verzus-accent/10 flex items-center justify-center mr-3">
-          <Wallet className="text-verzus-accent" size={20} />
+          <WalletIcon className="text-verzus-accent" size={20} />
         </div>
         <div>
           <h3 className="text-lg font-bold text-white">Your Wallet</h3>

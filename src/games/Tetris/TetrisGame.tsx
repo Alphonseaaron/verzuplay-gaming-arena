@@ -153,7 +153,7 @@ const TetrisGame = () => {
       }
       
       // Game loop
-      const dropInterval = Math.max(200, 1000 - (level * 100));
+      const dropInterval = Math.max(200, 1000 - (levelRef.current * 100));
       const gameLoop = setInterval(() => {
         if (isRunningRef.current && !gameOverRef.current) {
           movePiece(0, 1);
@@ -314,7 +314,10 @@ const TetrisGame = () => {
     
     if (rowsCleared > 0) {
       // Update score based on rows cleared
-      const points = [0, 100, 300, 500, 800][rowsCleared] * levelRef.current;
+      const pointsArray = [0, 100, 300, 500, 800];
+      const pointsValue = pointsArray[rowsCleared] || 0;
+      const currentLevel = levelRef.current;
+      const points = pointsValue * currentLevel;
       const newScore = scoreRef.current + points;
       setScore(newScore);
       

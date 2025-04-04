@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
@@ -6,570 +6,484 @@ import GlassMorphicContainer from '@/components/GlassMorphicContainer';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 
-const GRID_WIDTH = 10;
-const GRID_HEIGHT = 20;
-const CELL_SIZE = 25;
+// Define types
+type Grid = number[][];
+type Piece = number[][];
+type Position = { x: number; y: number };
+type SetState = React.Dispatch<React.SetStateAction<GameState>>;
 
-// Define Tetromino shapes
-const TETROMINOES = {
-  I: {
-    shape: [
-      [0, 0, 0, 0],
-      [1, 1, 1, 1],
-      [0, 0, 0, 0],
-      [0, 0, 0, 0]
-    ],
-    color: '#00FFFF'
-  },
-  J: {
-    shape: [
-      [1, 0, 0],
-      [1, 1, 1],
-      [0, 0, 0]
-    ],
-    color: '#0000FF'
-  },
-  L: {
-    shape: [
-      [0, 0, 1],
-      [1, 1, 1],
-      [0, 0, 0]
-    ],
-    color: '#FF7F00'
-  },
-  O: {
-    shape: [
-      [1, 1],
-      [1, 1]
-    ],
-    color: '#FFFF00'
-  },
-  S: {
-    shape: [
-      [0, 1, 1],
-      [1, 1, 0],
-      [0, 0, 0]
-    ],
-    color: '#00FF00'
-  },
-  T: {
-    shape: [
-      [0, 1, 0],
-      [1, 1, 1],
-      [0, 0, 0]
-    ],
-    color: '#800080'
-  },
-  Z: {
-    shape: [
-      [1, 1, 0],
-      [0, 1, 1],
-      [0, 0, 0]
-    ],
-    color: '#FF0000'
-  }
-};
+interface GameState {
+  grid: Grid;
+  piece: Piece;
+  position: Position;
+  rotation: number;
+  nextPiece: Piece;
+  isRunning: boolean;
+  score: number;
+  level: number;
+  rowsCleared: number;
+  gameOver: boolean;
+}
 
-const TetrisGame = () => {
+// Tetromino shapes
+const tetrominos: Piece[] = [
+  [[1, 1], [1, 1]],             // Square
+  [[0, 2, 0], [2, 2, 2]],       // T-shape
+  [[0, 3, 3], [3, 3, 0]],       // Z-shape
+  [[4, 4, 0], [0, 4, 4]],       // S-shape
+  [[0, 0, 5, 0], [5, 5, 5, 5]], // I-shape
+  [[0, 6, 0], [0, 6, 0], [6, 6, 0]],   // L-shape
+  [[0, 7, 0], [0, 7, 0], [0, 7, 7]]    // J-shape
+];
+
+// Game component
+const TetrisGame: React.FC = () => {
   const navigate = useNavigate();
   const { id, matchId } = useParams();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isRunning, setIsRunning] = useState(false);
-  const [score, setScore] = useState(0);
-  const [level, setLevel] = useState(1);
-  const [gameOver, setGameOver] = useState(false);
-  
-  // Create a blank board
-  const createEmptyBoard = () => {
-    return Array.from({ length: GRID_HEIGHT }, () =>
-      Array(GRID_WIDTH).fill(0)
-    );
+
+  // Game settings
+  const gridWidth = 12;
+  const gridHeight = 20;
+
+  // Initial game state
+  const initialGameState: GameState = {
+    grid: Array(gridHeight).fill(null).map(() => Array(gridWidth).fill(0)),
+    piece: tetrominos[Math.floor(Math.random() * tetrominos.length)],
+    position: { x: 5, y: 0 },
+    rotation: 0,
+    nextPiece: tetrominos[Math.floor(Math.random() * tetrominos.length)],
+    isRunning: false,
+    score: 0,
+    level: 1,
+    rowsCleared: 0,
+    gameOver: false,
   };
-  
-  const [board, setBoard] = useState(createEmptyBoard());
-  const [currentPiece, setCurrentPiece] = useState<any>(null);
-  const [nextPiece, setNextPiece] = useState<any>(null);
-  
-  // Refs for game loop
-  const boardRef = useRef(board);
-  const currentPieceRef = useRef(currentPiece);
-  const gameOverRef = useRef(gameOver);
-  const isRunningRef = useRef(isRunning);
-  const scoreRef = useRef(score);
-  const levelRef = useRef(level);
-  
+
+  const [state, setState] = useState<GameState>(initialGameState);
+  const stateRef = useRef(state);
+
+  // Update stateRef whenever state changes
   useEffect(() => {
-    // In a real app, we would connect to Firebase or another backend here
+    stateRef.current = state;
+  }, [state]);
+
+  // Game loop interval
+  const gameInterval = useRef<number | null>(null);
+
+  // Initialize game
+  useEffect(() => {
     if (matchId) {
       toast({
         title: "Match loaded",
         description: `You've joined match #${matchId}`,
       });
+    } else {
+      toast({
+        title: "New game",
+        description: "Starting a new Tetris game",
+      });
     }
-    
+  }, [matchId]);
+
+  // Generate random tetromino
+  const getRandomTetromino = useCallback(() => {
+    return tetrominos[Math.floor(Math.random() * tetrominos.length)];
+  }, []);
+
+  // Check collision
+  const checkCollision = useCallback((
+    grid: Grid,
+    piece: Piece,
+    position: Position,
+    rotation: number
+  ): boolean => {
+    const rotatedPiece = rotatePiece(piece, rotation);
+    for (let i = 0; i < rotatedPiece.length; i++) {
+      for (let j = 0; j < rotatedPiece[i].length; j++) {
+        if (rotatedPiece[i][j] !== 0) {
+          let x = position.x + j;
+          let y = position.y + i;
+
+          if (x < 0 || x >= gridWidth || y >= gridHeight) {
+            return true;
+          }
+          if (y < 0) {
+            continue;
+          }
+          if (grid[y][x] !== 0) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }, [gridWidth, gridHeight]);
+
+  // Rotate piece
+  const rotatePiece = useCallback((piece: Piece, rotation: number): Piece => {
+    const width = piece[0].length;
+    const height = piece.length;
+    const rotatedPiece: Grid = Array(width).fill(null).map(() => Array(height).fill(0));
+
+    for (let i = 0; i < height; i++) {
+      for (let j = 0; j < width; j++) {
+        switch (rotation % 4) {
+          case 0:
+            rotatedPiece[i][j] = piece[i][j];
+            break;
+          case 1:
+            rotatedPiece[j][height - 1 - i] = piece[i][j];
+            break;
+          case 2:
+            rotatedPiece[width - 1 - i][height - 1 - j] = piece[i][j];
+            break;
+          case 3:
+            rotatedPiece[width - 1 - j][i] = piece[i][j];
+            break;
+        }
+      }
+    }
+    return rotatedPiece;
+  }, []);
+
+  // Merge piece into grid
+  const mergePiece = useCallback((grid: Grid, piece: Piece, position: Position, rotation: number): Grid => {
+    const newGrid = grid.map(row => [...row]);
+    const rotatedPiece = rotatePiece(piece, rotation);
+
+    for (let i = 0; i < rotatedPiece.length; i++) {
+      for (let j = 0; j < rotatedPiece[i].length; j++) {
+        if (rotatedPiece[i][j] !== 0) {
+          newGrid[position.y + i][position.x + j] = rotatedPiece[i][j];
+        }
+      }
+    }
+    return newGrid;
+  }, [rotatePiece]);
+
+  // Game over
+  const handleGameOver = useCallback(() => {
+    clearInterval(gameInterval.current || undefined);
+    setState(prevState => ({ ...prevState, isRunning: false, gameOver: true }));
+    toast({
+      title: "Game Over",
+      description: "Better luck next time!",
+    });
+  }, []);
+
+  // Drop piece
+  const dropPiece = useCallback(() => {
+    if (!stateRef.current.isRunning || stateRef.current.gameOver) return;
+
+    let newPosition = { ...stateRef.current.position };
+    newPosition.y += 1;
+
+    if (!checkCollision(stateRef.current.grid, stateRef.current.piece, newPosition, stateRef.current.rotation)) {
+      setState(prevState => ({ ...prevState, position: newPosition }));
+    } else {
+      if (newPosition.y < 1) {
+        handleGameOver();
+        return;
+      }
+
+      const newGrid = mergePiece(stateRef.current.grid, stateRef.current.piece, stateRef.current.position, stateRef.current.rotation);
+      clearRows(newGrid);
+
+      setState(prevState => ({
+        ...prevState,
+        piece: stateRef.current.nextPiece,
+        nextPiece: getRandomTetromino(),
+        position: { x: 5, y: 0 },
+        rotation: 0,
+      }));
+    }
+  }, [checkCollision, mergePiece, getRandomTetromino, handleGameOver]);
+
+  // Start game loop
+  const startGameLoop = useCallback(() => {
+    if (gameInterval.current) {
+      clearInterval(gameInterval.current);
+    }
+
+    gameInterval.current = setInterval(() => {
+      dropPiece();
+    }, 1000 - (stateRef.current.level * 50));
+  }, [dropPiece]);
+
+  // Start game
+  const startGame = () => {
+    const initialGrid = Array(gridHeight).fill(null).map(() => Array(gridWidth).fill(0));
+    setState({
+      ...initialGameState,
+      grid: initialGrid,
+      piece: getRandomTetromino(),
+      nextPiece: getRandomTetromino(),
+      isRunning: true,
+      gameOver: false,
+    });
+    startGameLoop();
+  };
+
+  // Stop game
+  const stopGame = () => {
+    if (gameInterval.current) {
+      clearInterval(gameInterval.current);
+      gameInterval.current = null;
+    }
+    setState(prevState => ({ ...prevState, isRunning: false }));
+  };
+
+  // Move piece horizontally
+  const movePieceHorizontal = (direction: number) => {
+    if (!stateRef.current.isRunning || stateRef.current.gameOver) return;
+
+    let newPosition = { ...stateRef.current.position };
+    newPosition.x += direction;
+
+    if (!checkCollision(stateRef.current.grid, stateRef.current.piece, newPosition, stateRef.current.rotation)) {
+      setState(prevState => ({ ...prevState, position: newPosition }));
+    }
+  };
+
+  // Rotate piece
+  const rotate = () => {
+    if (!stateRef.current.isRunning || stateRef.current.gameOver) return;
+
+    let newRotation = stateRef.current.rotation + 1;
+    if (!checkCollision(stateRef.current.grid, stateRef.current.piece, stateRef.current.position, newRotation)) {
+      setState(prevState => ({ ...prevState, rotation: newRotation }));
+    }
+  };
+
+  // Handle key press
+  const handleKeyPress = useCallback((event: KeyboardEvent) => {
+    switch (event.key) {
+      case 'ArrowLeft':
+        movePieceHorizontal(-1);
+        break;
+      case 'ArrowRight':
+        movePieceHorizontal(1);
+        break;
+      case 'ArrowDown':
+        dropPiece();
+        break;
+      case 'ArrowUp':
+        rotate();
+        break;
+      case ' ': // Spacebar
+        event.preventDefault();
+        dropPiece();
+        break;
+    }
+  }, [dropPiece]);
+
+  // Add and remove key press listener
+  useEffect(() => {
     window.addEventListener('keydown', handleKeyPress);
-    
     return () => {
       window.removeEventListener('keydown', handleKeyPress);
     };
-  }, [matchId]);
-  
-  // Update refs when state changes
-  useEffect(() => {
-    boardRef.current = board;
-  }, [board]);
-  
-  useEffect(() => {
-    currentPieceRef.current = currentPiece;
-  }, [currentPiece]);
-  
-  useEffect(() => {
-    gameOverRef.current = gameOver;
-  }, [gameOver]);
-  
-  useEffect(() => {
-    isRunningRef.current = isRunning;
-  }, [isRunning]);
-  
-  useEffect(() => {
-    scoreRef.current = score;
-  }, [score]);
-  
-  useEffect(() => {
-    levelRef.current = level;
-  }, [level]);
-  
-  // Initialize game
-  useEffect(() => {
-    if (isRunning && !gameOver) {
-      if (!currentPiece) {
-        getNewPiece();
-      }
-      
-      const canvas = canvasRef.current;
-      if (canvas) {
-        renderGame();
-      }
-      
-      // Game loop
-      const dropInterval = Math.max(200, 1000 - (levelRef.current * 100));
-      const gameLoop = setInterval(() => {
-        if (isRunningRef.current && !gameOverRef.current) {
-          movePiece(0, 1);
-        }
-      }, dropInterval);
-      
-      return () => {
-        clearInterval(gameLoop);
-      };
-    }
-  }, [isRunning, gameOver, currentPiece, level]);
-  
-  const getRandomTetromino = () => {
-    const keys = Object.keys(TETROMINOES);
-    const tetroName = keys[Math.floor(Math.random() * keys.length)] as keyof typeof TETROMINOES;
-    const tetromino = TETROMINOES[tetroName];
-    
-    return {
-      pos: { x: GRID_WIDTH / 2 - Math.ceil(tetromino.shape[0] / 2), y: 0 },
-      shape: tetromino.shape,
-      color: tetromino.color
-    };
-  };
-  
-  const getNewPiece = () => {
-    if (nextPiece) {
-      setCurrentPiece(nextPiece);
-      currentPieceRef.current = nextPiece;
-    } else {
-      const newPiece = getRandomTetromino();
-      setCurrentPiece(newPiece);
-      currentPieceRef.current = newPiece;
-    }
-    
-    const newNextPiece = getRandomTetromino();
-    setNextPiece(newNextPiece);
-    
-    // Check if game over by seeing if new piece collides immediately
-    if (checkCollision(currentPieceRef.current, 0, 0)) {
-      setGameOver(true);
-      gameOverRef.current = true;
-      setIsRunning(false);
-      isRunningRef.current = false;
-    }
-  };
-  
-  const checkCollision = (piece: any, moveX: number, moveY: number) => {
-    if (!piece) return false;
-    
-    for (let y = 0; y < piece.shape.length; y++) {
-      for (let x = 0; x < piece.shape[y].length; x++) {
-        // Skip empty cells
-        if (piece.shape[y][x] === 0) continue;
-        
-        const newX = piece.pos.x + x + moveX;
-        const newY = piece.pos.y + y + moveY;
-        
-        // Check collision with walls and floor
-        if (
-          newX < 0 || 
-          newX >= GRID_WIDTH || 
-          newY >= GRID_HEIGHT
-        ) {
-          return true;
-        }
-        
-        // Check collision with board pieces
-        if (newY >= 0 && boardRef.current[newY][newX] !== 0) {
-          return true;
-        }
-      }
-    }
-    
-    return false;
-  };
-  
-  const movePiece = (x: number, y: number) => {
-    if (!currentPieceRef.current || gameOverRef.current) return;
-    
-    if (!checkCollision(currentPieceRef.current, x, y)) {
-      setCurrentPiece(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          pos: {
-            x: prev.pos.x + x,
-            y: prev.pos.y + y
+  }, [handleKeyPress]);
+
+  // Clear rows
+  const clearRows = (grid: Grid) => {
+      const grid = [...stateRef.current.grid];
+      for (let i = 0; i < grid.length; i++) {
+        let allFilled = true;
+        for (let j = 0; j < grid[0].length; j++) {
+          if (grid[i][j] === 0) {
+            allFilled = false;
+            break;
           }
-        };
-      });
-    } else if (y > 0) {
-      // Collision when moving down means piece is set
-      mergePiece();
-      clearRows();
-      getNewPiece();
-    }
-  };
-  
-  const rotatePiece = () => {
-    if (!currentPieceRef.current || gameOverRef.current) return;
-    
-    const piece = { ...currentPieceRef.current };
-    
-    // Create rotated shape
-    const rotatedShape = piece.shape.map((_, i) =>
-      piece.shape.map(row => row[i]).reverse()
-    );
-    
-    const rotatedPiece = {
-      ...piece,
-      shape: rotatedShape
-    };
-    
-    // Only apply rotation if it doesn't cause a collision
-    if (!checkCollision(rotatedPiece, 0, 0)) {
-      setCurrentPiece(rotatedPiece);
-    }
-  };
-  
-  const mergePiece = () => {
-    if (!currentPieceRef.current) return;
-    
-    const piece = currentPieceRef.current;
-    const newBoard = [...boardRef.current];
-    
-    for (let y = 0; y < piece.shape.length; y++) {
-      for (let x = 0; x < piece.shape[y].length; x++) {
-        if (piece.shape[y][x] !== 0) {
-          const boardY = piece.pos.y + y;
-          const boardX = piece.pos.x + x;
+        }
+        
+        if (allFilled) {
+          // Move all rows above this one down
+          for (let k = i; k > 0; k--) {
+            grid[k] = [...grid[k - 1]];
+          }
+          // Fill the top row with empty cells
+          grid[0] = Array(grid[0].length).fill(0);
           
-          if (boardY >= 0) {
-            newBoard[boardY][boardX] = piece.color;
-          }
-        }
-      }
-    }
-    
-    setBoard(newBoard);
-    boardRef.current = newBoard;
-  };
-  
-  const clearRows = () => {
-    let rowsCleared = 0;
-    const newBoard = [...boardRef.current];
-    
-    for (let y = GRID_HEIGHT - 1; y >= 0; y--) {
-      // Check if row is full
-      if (newBoard[y].every(cell => cell !== 0)) {
-        // Remove the row and add a new empty row at the top
-        newBoard.splice(y, 1);
-        newBoard.unshift(Array(GRID_WIDTH).fill(0));
-        rowsCleared++;
-        // Check the same row again after shifting
-        y++;
-      }
-    }
-    
-    if (rowsCleared > 0) {
-      // Update score based on rows cleared
-      const pointsArray = [0, 100, 300, 500, 800];
-      const pointsValue = pointsArray[rowsCleared] || 0;
-      const currentLevel = levelRef.current;
-      const points = pointsValue * (currentLevel as number);
-      const newScore = scoreRef.current + points;
-      setScore(newScore);
-      
-      // Update level every 10 rows cleared
-      const totalCleared = Math.floor(newScore / 1000);
-      const newLevel = Math.max(1, Math.min(10, Math.floor(totalCleared / 10) + 1));
-      setLevel(newLevel);
-      
-      setBoard(newBoard);
-      boardRef.current = newBoard;
-    }
-  };
-  
-  const handleKeyPress = (e: KeyboardEvent) => {
-    if (!isRunningRef.current || gameOverRef.current) return;
-    
-    switch (e.key) {
-      case 'ArrowLeft':
-        movePiece(-1, 0);
-        break;
-      case 'ArrowRight':
-        movePiece(1, 0);
-        break;
-      case 'ArrowDown':
-        movePiece(0, 1);
-        break;
-      case 'ArrowUp':
-        rotatePiece();
-        break;
-      case ' ':
-        // Hard drop
-        while (!checkCollision(currentPieceRef.current, 0, 1)) {
-          movePiece(0, 1);
-        }
-        break;
-    }
-    
-    renderGame();
-  };
-  
-  const renderGame = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw board background
-    ctx.fillStyle = '#111';
-    ctx.fillRect(0, 0, GRID_WIDTH * CELL_SIZE, GRID_HEIGHT * CELL_SIZE);
-    
-    // Draw grid lines
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 0.5;
-    
-    for (let i = 0; i <= GRID_WIDTH; i++) {
-      ctx.beginPath();
-      ctx.moveTo(i * CELL_SIZE, 0);
-      ctx.lineTo(i * CELL_SIZE, GRID_HEIGHT * CELL_SIZE);
-      ctx.stroke();
-    }
-    
-    for (let i = 0; i <= GRID_HEIGHT; i++) {
-      ctx.beginPath();
-      ctx.moveTo(0, i * CELL_SIZE);
-      ctx.lineTo(GRID_WIDTH * CELL_SIZE, i * CELL_SIZE);
-      ctx.stroke();
-    }
-    
-    // Draw board pieces
-    for (let y = 0; y < boardRef.current.length; y++) {
-      for (let x = 0; x < boardRef.current[y].length; x++) {
-        if (boardRef.current[y][x] !== 0) {
-          ctx.fillStyle = boardRef.current[y][x];
-          ctx.fillRect(
-            x * CELL_SIZE,
-            y * CELL_SIZE,
-            CELL_SIZE,
-            CELL_SIZE
-          );
+          // Update score and possibly level
+          const newScore = stateRef.current.score + 100;
+          const newLevel = Math.floor(newScore / 1000) + 1;
           
-          ctx.strokeStyle = '#000';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(
-            x * CELL_SIZE,
-            y * CELL_SIZE,
-            CELL_SIZE,
-            CELL_SIZE
-          );
+          setState({
+            ...stateRef.current,
+            grid,
+            score: newScore,
+            level: newLevel,
+            rowsCleared: stateRef.current.rowsCleared + 1
+          });
         }
       }
-    }
-    
-    // Draw current piece
-    if (currentPieceRef.current) {
-      const piece = currentPieceRef.current;
-      
-      for (let y = 0; y < piece.shape.length; y++) {
-        for (let x = 0; x < piece.shape[y].length; x++) {
-          if (piece.shape[y][x] !== 0) {
-            const pieceX = piece.pos.x + x;
-            const pieceY = piece.pos.y + y;
-            
-            if (pieceY >= 0) {
-              ctx.fillStyle = piece.color;
-              ctx.fillRect(
-                pieceX * CELL_SIZE,
-                pieceY * CELL_SIZE,
-                CELL_SIZE,
-                CELL_SIZE
-              );
-              
-              ctx.strokeStyle = '#000';
-              ctx.lineWidth = 1;
-              ctx.strokeRect(
-                pieceX * CELL_SIZE,
-                pieceY * CELL_SIZE,
-                CELL_SIZE,
-                CELL_SIZE
-              );
-            }
-          }
-        }
-      }
-    }
-    
-    // Draw "Next Piece" preview
-    if (nextPiece) {
-      const previewX = GRID_WIDTH * CELL_SIZE + 20;
-      const previewY = 20;
-      
-      ctx.fillStyle = '#222';
-      ctx.fillRect(previewX, previewY, 6 * CELL_SIZE, 6 * CELL_SIZE);
-      
-      // Draw preview title
-      ctx.fillStyle = 'white';
-      ctx.font = '16px Arial';
-      ctx.fillText('Next Piece', previewX + 10, previewY - 10);
-      
-      // Draw the next piece centered in the preview area
-      for (let y = 0; y < nextPiece.shape.length; y++) {
-        for (let x = 0; x < nextPiece.shape[y].length; x++) {
-          if (nextPiece.shape[y][x] !== 0) {
-            ctx.fillStyle = nextPiece.color;
-            ctx.fillRect(
-              previewX + (x + 1) * CELL_SIZE,
-              previewY + (y + 1) * CELL_SIZE,
-              CELL_SIZE,
-              CELL_SIZE
-            );
-            
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(
-              previewX + (x + 1) * CELL_SIZE,
-              previewY + (y + 1) * CELL_SIZE,
-              CELL_SIZE,
-              CELL_SIZE
-            );
-          }
-        }
-      }
-      
-      // Draw game info
-      const infoX = previewX;
-      const infoY = previewY + 8 * CELL_SIZE;
-      
-      ctx.fillStyle = 'white';
-      ctx.font = '16px Arial';
-      ctx.fillText(`Score: ${score}`, infoX, infoY);
-      ctx.fillText(`Level: ${level}`, infoX, infoY + 30);
-    }
-    
-    // Draw game over message
-    if (gameOverRef.current) {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = 'white';
-      ctx.font = '24px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('Game Over', GRID_WIDTH * CELL_SIZE / 2, GRID_HEIGHT * CELL_SIZE / 2 - 15);
-      ctx.font = '16px Arial';
-      ctx.fillText(`Score: ${score}`, GRID_WIDTH * CELL_SIZE / 2, GRID_HEIGHT * CELL_SIZE / 2 + 15);
-      ctx.fillText('Press Start to Play Again', GRID_WIDTH * CELL_SIZE / 2, GRID_HEIGHT * CELL_SIZE / 2 + 45);
-    }
   };
-  
-  const startGame = () => {
-    // Reset game
-    setBoard(createEmptyBoard());
-    setScore(0);
-    setLevel(1);
-    setCurrentPiece(null);
-    setNextPiece(null);
-    setGameOver(false);
-    setIsRunning(true);
-    
-    // Update refs
-    boardRef.current = createEmptyBoard();
-    currentPieceRef.current = null;
-    gameOverRef.current = false;
-    isRunningRef.current = true;
-    
-    getNewPiece();
-  };
-  
-  const pauseGame = () => {
-    setIsRunning(false);
-  };
-  
+
   const handleExitGame = () => {
+    stopGame();
     navigate(`/games/${id}`);
   };
 
   return (
     <div className="min-h-screen flex flex-col">
       <Navigation />
-      
+
       <div className="container mx-auto px-4 py-8 flex-1">
         <GlassMorphicContainer className="p-6">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-white">Tetris</h1>
             <Button variant="outline" onClick={handleExitGame}>Exit Game</Button>
           </div>
-          
-          <div className="flex justify-center mb-6">
-            <canvas 
-              ref={canvasRef} 
-              width={GRID_WIDTH * CELL_SIZE + 200} 
-              height={GRID_HEIGHT * CELL_SIZE} 
-              className="border-2 border-verzus-border rounded"
-            />
-          </div>
-          
-          <div className="flex justify-center gap-4 mb-4">
-            {isRunning ? (
-              <Button onClick={pauseGame}>Pause</Button>
-            ) : (
-              <Button onClick={startGame}>{gameOver ? 'Restart' : 'Start'}</Button>
-            )}
-          </div>
-          
-          <div className="text-center">
-            <p className="text-verzus-text-secondary">
-              Controls: Arrow keys to move and rotate. Space for hard drop.
-            </p>
+
+          <div className="flex flex-col md:flex-row gap-8">
+            <div className="flex-1">
+              <div className="flex justify-center mb-4">
+                <div className="tetris-board border border-verzus-border rounded overflow-hidden shadow-xl">
+                  {state.grid.map((row, rowIndex) => (
+                    <div key={rowIndex} className="flex">
+                      {row.map((cell, colIndex) => {
+                        let cellColor = 'bg-gray-900'; // Default empty cell color
+                        if (cell === 1) cellColor = 'bg-yellow-500';
+                        else if (cell === 2) cellColor = 'bg-red-500';
+                        else if (cell === 3) cellColor = 'bg-green-500';
+                        else if (cell === 4) cellColor = 'bg-purple-500';
+                        else if (cell === 5) cellColor = 'bg-blue-500';
+                        else if (cell === 6) cellColor = 'bg-orange-500';
+                        else if (cell === 7) cellColor = 'bg-cyan-500';
+
+                        // Overlay the current piece
+                        let overlayColor = cellColor;
+                        const rotatedPiece = rotatePiece(state.piece, state.rotation);
+                        if (
+                          rowIndex >= state.position.y &&
+                          rowIndex < state.position.y + rotatedPiece.length
+                        ) {
+                          const pieceRowIndex = rowIndex - state.position.y;
+                          if (
+                            colIndex >= state.position.x &&
+                            colIndex < state.position.x + rotatedPiece[0].length
+                          ) {
+                            const pieceColIndex = colIndex - state.position.x;
+                            if (rotatedPiece[pieceRowIndex][pieceColIndex] !== 0) {
+                              if (rotatedPiece[pieceRowIndex][pieceColIndex] === 1) overlayColor = 'bg-yellow-500';
+                              else if (rotatedPiece[pieceRowIndex][pieceColIndex] === 2) overlayColor = 'bg-red-500';
+                              else if (rotatedPiece[pieceRowIndex][pieceColIndex] === 3) overlayColor = 'bg-green-500';
+                              else if (rotatedPiece[pieceRowIndex][pieceColIndex] === 4) overlayColor = 'bg-purple-500';
+                              else if (rotatedPiece[pieceRowIndex][pieceColIndex] === 5) overlayColor = 'bg-blue-500';
+                              else if (rotatedPiece[pieceRowIndex][pieceColIndex] === 6) overlayColor = 'bg-orange-500';
+                              else if (rotatedPiece[pieceRowIndex][pieceColIndex] === 7) overlayColor = 'bg-cyan-500';
+                            }
+                          }
+                        }
+
+                        return (
+                          <div
+                            key={`${rowIndex}-${colIndex}`}
+                            className={`w-6 h-6 flex items-center justify-center ${overlayColor}`}
+                          >
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="w-full md:w-1/3">
+              <div className="bg-verzus-background-light p-4 rounded-lg mb-6">
+                <h2 className="text-xl font-bold text-white mb-4">Game Info</h2>
+
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-verzus-text-secondary mb-1">Score:</p>
+                    <p className="text-lg font-bold text-white">{state.score}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-verzus-text-secondary mb-1">Level:</p>
+                    <p className="text-lg font-bold text-white">{state.level}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-verzus-text-secondary mb-1">Rows Cleared:</p>
+                    <p className="text-lg font-bold text-white">{state.rowsCleared}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-verzus-text-secondary mb-1">Status:</p>
+                    <p className="text-lg font-bold text-white">
+                      {state.gameOver
+                        ? 'Game Over'
+                        : state.isRunning
+                          ? 'Playing'
+                          : 'Paused'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-verzus-background-light p-4 rounded-lg mb-6">
+                <h2 className="text-xl font-bold text-white mb-4">Next Piece</h2>
+                <div className="flex justify-center">
+                  <div className="tetris-board border border-verzus-border rounded overflow-hidden shadow-md">
+                    {Array(4).fill(null).map((_, rowIndex) => (
+                      <div key={rowIndex} className="flex">
+                        {Array(4).fill(null).map((_, colIndex) => {
+                          let cellColor = 'bg-gray-900'; // Default empty cell color
+                          if (
+                            rowIndex < state.nextPiece.length &&
+                            colIndex < state.nextPiece[0].length &&
+                            state.nextPiece[rowIndex][colIndex] !== 0
+                          ) {
+                            if (state.nextPiece[rowIndex][colIndex] === 1) cellColor = 'bg-yellow-500';
+                            else if (state.nextPiece[rowIndex][colIndex] === 2) cellColor = 'bg-red-500';
+                            else if (state.nextPiece[rowIndex][colIndex] === 3) cellColor = 'bg-green-500';
+                            else if (state.nextPiece[rowIndex][colIndex] === 4) cellColor = 'bg-purple-500';
+                            else if (state.nextPiece[rowIndex][colIndex] === 5) cellColor = 'bg-blue-500';
+                            else if (state.nextPiece[rowIndex][colIndex] === 6) cellColor = 'bg-orange-500';
+                            else if (state.nextPiece[rowIndex][colIndex] === 7) cellColor = 'bg-cyan-500';
+                          }
+                          return (
+                            <div
+                              key={`${rowIndex}-${colIndex}`}
+                              className={`w-6 h-6 flex items-center justify-center ${cellColor}`}
+                            >
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-verzus-background-light p-4 rounded-lg mb-6">
+                <h2 className="text-xl font-bold text-white mb-4">Controls</h2>
+                <ul className="list-disc list-inside text-verzus-text-secondary space-y-2">
+                  <li>Left Arrow: Move left</li>
+                  <li>Right Arrow: Move right</li>
+                  <li>Up Arrow: Rotate</li>
+                  <li>Down Arrow: Drop faster</li>
+                  <li>Spacebar: Drop piece</li>
+                </ul>
+              </div>
+
+              {!state.isRunning ? (
+                <Button onClick={startGame} className="w-full mb-2">
+                  Start Game
+                </Button>
+              ) : (
+                <Button onClick={stopGame} className="w-full mb-2">
+                  Stop Game
+                </Button>
+              )}
+            </div>
           </div>
         </GlassMorphicContainer>
       </div>
-      
+
       <Footer />
     </div>
   );

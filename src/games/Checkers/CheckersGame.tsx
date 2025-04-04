@@ -179,8 +179,8 @@ const CheckersGame: React.FC = () => {
     const isJump = Math.abs(fromRow - toRow) === 2;
     
     if (isJump) {
-      const captureRow = (fromRow + toRow) / 2;
-      const captureCol = (fromCol + toCol) / 2;
+      const captureRow = Math.floor((fromRow + toRow) / 2);
+      const captureCol = Math.floor((fromCol + toCol) / 2);
       newBoard[captureRow][captureCol] = '';
     }
     
@@ -357,8 +357,8 @@ const CheckersGame: React.FC = () => {
         const isJump = Math.abs(fromRow - toRow) === 2;
         
         if (isJump) {
-          const captureRow = (fromRow + toRow) / 2;
-          const captureCol = (fromCol + toCol) / 2;
+          const captureRow = Math.floor((fromRow + toRow) / 2);
+          const captureCol = Math.floor((fromCol + toCol) / 2);
           newBoard[captureRow][captureCol] = '';
         }
         
@@ -468,7 +468,7 @@ const CheckersGame: React.FC = () => {
           <div className="flex flex-col md:flex-row gap-8">
             <div className="flex-1">
               <div className="flex justify-center mb-4">
-                <div className="checkers-board border border-verzus-border rounded overflow-hidden">
+                <div className="checkers-board border border-verzus-border rounded overflow-hidden shadow-xl">
                   {gameState.board.map((row, rowIndex) => (
                     <div key={rowIndex} className="flex">
                       {row.map((piece, colIndex) => (

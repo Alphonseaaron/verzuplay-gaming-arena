@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
@@ -67,8 +68,8 @@ const TetrisGame: React.FC = () => {
     stateRef.current = state;
   }, [state]);
 
-  // Game loop interval
-  const gameInterval = useRef<number | null>(null);
+  // Game loop interval - Fixed type to NodeJS.Timeout
+  const gameInterval = useRef<NodeJS.Timeout | null>(null);
 
   // Initialize game
   useEffect(() => {
@@ -163,12 +164,59 @@ const TetrisGame: React.FC = () => {
 
   // Game over
   const handleGameOver = useCallback(() => {
-    clearInterval(gameInterval.current || undefined);
+    if (gameInterval.current) {
+      clearInterval(gameInterval.current);
+    }
     setState(prevState => ({ ...prevState, isRunning: false, gameOver: true }));
     toast({
       title: "Game Over",
       description: "Better luck next time!",
     });
+  }, []);
+
+  // Clear rows - Fixed the parameter naming issue
+  const clearRows = useCallback((inputGrid: Grid): Grid => {
+    const gridCopy = [...inputGrid];
+    let rowsCleared = 0;
+    
+    for (let i = 0; i < gridCopy.length; i++) {
+      let allFilled = true;
+      for (let j = 0; j < gridCopy[0].length; j++) {
+        if (gridCopy[i][j] === 0) {
+          allFilled = false;
+          break;
+        }
+      }
+      
+      if (allFilled) {
+        rowsCleared++;
+        // Move all rows above this one down
+        for (let k = i; k > 0; k--) {
+          gridCopy[k] = [...gridCopy[k - 1]];
+        }
+        // Fill the top row with empty cells
+        gridCopy[0] = Array(gridCopy[0].length).fill(0);
+        
+        // Since we modified the current row and moved others down,
+        // we need to recheck this row
+        i--;
+      }
+    }
+    
+    if (rowsCleared > 0) {
+      const newScore = stateRef.current.score + (rowsCleared * 100);
+      const newLevel = Math.floor(newScore / 1000) + 1;
+      
+      setState(prevState => ({
+        ...prevState,
+        grid: gridCopy,
+        score: newScore,
+        level: newLevel,
+        rowsCleared: prevState.rowsCleared + rowsCleared
+      }));
+    }
+    
+    return gridCopy;
   }, []);
 
   // Drop piece
@@ -187,17 +235,18 @@ const TetrisGame: React.FC = () => {
       }
 
       const newGrid = mergePiece(stateRef.current.grid, stateRef.current.piece, stateRef.current.position, stateRef.current.rotation);
-      clearRows(newGrid);
+      const updatedGrid = clearRows(newGrid);
 
       setState(prevState => ({
         ...prevState,
+        grid: updatedGrid,
         piece: stateRef.current.nextPiece,
         nextPiece: getRandomTetromino(),
         position: { x: 5, y: 0 },
         rotation: 0,
       }));
     }
-  }, [checkCollision, mergePiece, getRandomTetromino, handleGameOver]);
+  }, [checkCollision, mergePiece, getRandomTetromino, handleGameOver, clearRows]);
 
   // Start game loop
   const startGameLoop = useCallback(() => {
@@ -284,41 +333,6 @@ const TetrisGame: React.FC = () => {
       window.removeEventListener('keydown', handleKeyPress);
     };
   }, [handleKeyPress]);
-
-  // Clear rows
-  const clearRows = (grid: Grid) => {
-      const grid = [...stateRef.current.grid];
-      for (let i = 0; i < grid.length; i++) {
-        let allFilled = true;
-        for (let j = 0; j < grid[0].length; j++) {
-          if (grid[i][j] === 0) {
-            allFilled = false;
-            break;
-          }
-        }
-        
-        if (allFilled) {
-          // Move all rows above this one down
-          for (let k = i; k > 0; k--) {
-            grid[k] = [...grid[k - 1]];
-          }
-          // Fill the top row with empty cells
-          grid[0] = Array(grid[0].length).fill(0);
-          
-          // Update score and possibly level
-          const newScore = stateRef.current.score + 100;
-          const newLevel = Math.floor(newScore / 1000) + 1;
-          
-          setState({
-            ...stateRef.current,
-            grid,
-            score: newScore,
-            level: newLevel,
-            rowsCleared: stateRef.current.rowsCleared + 1
-          });
-        }
-      }
-  };
 
   const handleExitGame = () => {
     stopGame();
